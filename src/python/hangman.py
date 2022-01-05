@@ -25,7 +25,7 @@ def get_word(filename: str) -> str:
 
 
 def make_guess() -> str:
-    char = input("Insert an alphanumerical character (or 1 to quit): ").upper()
+    char = input("Insert an alphabetic character (or 1 to quit): ").upper()
     while not (char.isalpha or char == '1'):
         return make_guess()
     return char
@@ -55,7 +55,8 @@ def play(sec_word: str) -> int:
         clean_screen()
         render_screen(lives, player_word, wrong_guesses)
         guess = make_guess()
-        if guess == '1': break
+        if guess == '1':
+            break
         elif guess in sec_word:
             player_word = replace_char(guess, sec_word, player_word)
         else:
