@@ -74,9 +74,6 @@ int play(const char *secret_word)
 
     if (guess == '1') {
         return -1;
-    } else if (current_lives == 0) {
-        return 0;
-    } else {
-        return 1;
     }
+    return current_lives;
 }

@@ -44,8 +44,8 @@
     Runs the logic of the hangman given a secret word,
     asking for user to guess the word.
     Returns an int indicating the status in which the
-    game finished. 1 if is a win, 0 if is a loss, and -1
-    if game was quitted
+    game finished. -1 if game was quitted, else number
+    of remaining lives
     */
     int play(const char *secret_word);
 

@@ -1,5 +1,11 @@
 #include "IO.h"
 
+static int random_num(int min, int max) {
+    srand(time(NULL));
+    int range = max - min + 1;
+    return (rand() % range) + min;
+}
+
 FILE* open_or_exit(const char* filename, char* mode) {
     FILE* fp = fopen(filename, mode);
     if (fp == NULL) {
@@ -56,14 +62,4 @@ FILE_CONTENT readlines(FILE *fp) {
     
     free(tmp);
     return fc;
-}
-
-static int random_num(int min, int max) {
-    srand(time(NULL));
-    int range = max - min + 1;
-    return (rand() % range) + min;
-}
-
-void clear_screen() {
-    system(CLEAN_CMD);
 }

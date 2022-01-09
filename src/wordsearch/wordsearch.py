@@ -1,19 +1,14 @@
-from typing import List
+from typing import List, Optional
 import sys
 import random
 
-"""
-Definimos los siguientes tipos para facilitar la lectura de
-las signaturas de las funciones
-
-Sopa: List(List(Str))
-Palabras: Set(Str)
-Direccion: Tuple(Int, Int)
-"""
+GRID = List[List[str]]
+ORIENTATION = tuple[int, int]
+POSITION = tuple[int, int]
 
 # --------------------------- READ WORDS -------------------------
 
-def choose_words(filename: str, nwords: int, dim: int) -> List[int]:
+def choose_words(filename: str, nwords: int, dim: int) -> set[int]:
     with open(filename) as f:
         words: List[str] = f.readlines()
         words_in_file: int = len(words)
@@ -24,40 +19,35 @@ def choose_words(filename: str, nwords: int, dim: int) -> List[int]:
         if len(random_word) > dim:
             continue
         chosen_words.add(random_word)
-    return list(chosen_words)
+    return chosen_words
 
-# ------------------ FUNCIONES GENERAR SOPA DE LETRAS -------------------
+# ------------------ GENERATE WORD SEARCH -------------------
 
-def generar_sopa(dim, palabras, complejidad):
+def make_wordsearch(dim: int, words: set[str], complexity: int) -> Optional[GRID]:
     """
-    generar_sopa : Int Palabras Int -> Sopa
-    Intenta generar una sopa de letras con la dimension, palabras y complejidad
+    Intenta generar una sopa de letras con la dimension, palabras y complexity
     dada. En caso de no ser posible, retorna una lista y un diccionario vacio.
     Si el conjunto de palabras es vacio, se retorna una sopa con la dimension pedida
     vacia. Por otro lado, si es posible generarse una sopa de letras, retornara
     una sopa de letras con las palabras ubicadas, y las demas posiciones vacias
     """
-    sopa = [['_' for _ in range(dim)] for _ in range(dim)]
+    wordsearch = [['_' for _ in range(dim)] for _ in range(dim)]
 
-    if not palabras:
-        return sopa
-    
-    direcciones = direcciones_por_complejidad(complejidad)
+    orientations = direcciones_por_complejidad(complexity)
 
-    # Si la complejidad del juege fuese 3, entonces
+    # Si la complexity del juege fuese 3, entonces
     # se esta permitido que las palabras se intersequen
-    intersecar_palabras = True if complejidad == 3 else False
+    cross_words = True if complexity == 3 else False
 
     # El stack lleva cuenta de las combinaciones que se prueban
     # en la sopa de letras
     stack = []
-    posiciones = []
+    positions = [(i, j) 
+        for i in range(dim)
+        for j in range(dim)
+    ]
 
-    for i in range(dim):
-        for j in range(dim):
-            posiciones.append((i ,j))
-
-    palabras_sin_colocar = sorted(list(palabras), key = len)
+    unplaced_words = sorted(list(words), key = len)
 
     # Agregamos al stack el primer estado, el cual tiene
     # como sopa la sopa vacia, la palabra mas larga,
@@ -65,53 +55,53 @@ def generar_sopa(dim, palabras, complejidad):
     # para esta palabra
     stack.append(
         {
-            "sopa": sopa, 
-            "palabra": palabras.pop(), 
-            "posiciones": random.sample(posiciones, dim ** 2),
-            "direcciones": random.sample(list(direcciones), len(direcciones))
+            "grid": wordsearch, 
+            "word": words.pop(), 
+            "positions": random.sample(positions, dim ** 2),
+            "orientations": random.sample(list(orientations), len(orientations))
         }
     )
 
-    while palabras_sin_colocar:
+    while unplaced_words:
         # Si no hay mas estados para probar,
         # significa que no hay dispoisiciones posibles
         if not stack:
-            return list()
+            return None
 
-        estado_actual = stack[-1]
+        current_state = stack[-1]
 
         # Comprobamos que haya posiciones en la sopa donde probar la palabra
-        if estado_actual["posiciones"]:
-            posicion = estado_actual["posiciones"][-1]
+        if current_state["positions"]:
+            position = current_state["positions"][-1]
             # Comprobamos que haya direcciones para probar la palabra en la posicion
-            if estado_actual["direcciones"]:
-                direccion = estado_actual["direcciones"][-1]
-                modificado, sopa = modificar_sopa(
-                        estado_actual["sopa"], posicion, direccion, estado_actual["palabra"], intersecar_palabras
+            if current_state["orientations"]:
+                orientation = current_state["orientations"][-1]
+                modified, wordsearch = modify_grid(
+                    current_state["grid"], position, orientation, current_state["word"], cross_words
                 )
                 # Verificamos que se haya podido modificar la sopa y que no haya duplicados
-                if modificado and not hay_duplicados(sopa, palabras):
+                if modified and not check_duplicates(wordsearch, words):
                     # Si todavia hay palabras por colocar
                     # creamos un nuevo estado con la proxima palabra en la lista,
                     # inicializamos las posiciones y direcciones a probar, y agregamos el
                     # estado a la lista de estados
-                    if palabras_sin_colocar:
-                        nuevo_estado = {
-                            "sopa": sopa,
-                            "palabra": palabras_sin_colocar.pop(),
-                            "posiciones": random.sample(posiciones, dim ** 2),
-                            "direcciones": random.sample(list(direcciones), len(direcciones))
+                    if unplaced_words:
+                        new_state = {
+                            "grid": wordsearch,
+                            "word": unplaced_words.pop(),
+                            "positions": random.sample(positions, dim ** 2),
+                            "orientations": random.sample(list(orientations), len(orientations))
                         }
-                        stack.append(nuevo_estado)
+                        stack.append(new_state)
                 else:
                     # Si la palabra no encajó en la sopa, quitamos la direccion
                     # para probar con la siguiente
-                    estado_actual["direcciones"].pop()
+                    current_state["orientations"].pop()
             else:
                 # Al no haber direcciones para probar, probamos con la
                 # siguiente posicion
-                estado_actual["posiciones"].pop()
-                estado_actual["direcciones"] = random.sample(list(direcciones), len(direcciones))
+                current_state["positions"].pop()
+                current_state["orientations"] = random.sample(list(orientations), len(orientations))
         else:
             # Si no hay posiciones por probar, volvemos al estado anterior
             # y seguimos probando con distintas disposiciones
@@ -119,32 +109,32 @@ def generar_sopa(dim, palabras, complejidad):
             # Restamos en uno el contador ya que ahora tenemos una
             # una palabra mas por colocar, y añadimos la palabra nuevamente a la
             # lista
-            palabras_sin_colocar.append(estado_actual["palabra"])
-    return sopa
+            unplaced_words.append(current_state["word"])
+    return wordsearch
 
 
-def completar_sopa(sopa, palabras):
+def fill_wordsearch(grid: GRID, words: set[str]) -> GRID:
     """
-    completar_sopa : Sopa Palabras -> Sopa
+    fill_wordsearch : Sopa Palabras -> Sopa
     Toma una lista de lista de strings (una sopa de letras) incompleta,
     donde faltan colocar caracteres que no van relacionados a las palabras,
     y rellena estos espacios tal que ninguna de las palabras a encontrar
     esté dos veces en la sopa
     """
     
-    dim = len(sopa)
+    filled_wordsearch = fill_blanks(grid)
 
-    sopa_completada = completar_espacios(sopa)
+    while check_duplicates(filled_wordsearch, words):
+        filled_wordsearch = fill_blanks(grid)
 
-    while hay_duplicados(sopa_completada, palabras):
-        sopa_completada = completar_espacios(sopa)
-
-    return sopa_completada
+    return filled_wordsearch
 
 
-def modificar_sopa(sopa, pos, dir, palabra, intersecar_palabras):
+def modify_grid(
+    grid: GRID, position: POSITION, orientation: ORIENTATION, word: str, cross: bool
+    ) -> tuple[bool, GRID]:
     """
-    modificar_sopa: Sopa Tuple(Int, Int) Direccion Str Bool -> Tuple(Bool, Sopa)
+    modify_grid: Sopa Tuple(Int, Int) Direccion Str Bool -> Tuple(Bool, Sopa)
     
     Toma una sopa, una posicion, direccion y palabra, y un booleano que indica la posibilidad de
     que las palabras se intersequen en la sopa. Se intenta colocar la palabra dada
@@ -169,29 +159,29 @@ def modificar_sopa(sopa, pos, dir, palabra, intersecar_palabras):
 
     """
     # Creamos una copia para no modificar la original
-    copia = copiar_sopa(sopa)
-    dim = len(sopa)
+    copy = copy_grid(grid)
+    dim = len(grid)
 
-    for i in range(len(palabra)):
-        x = pos[0] + dir[0] * i
-        y = pos[1] + dir[1] * i
+    for i in range(len(word)):
+        x = position[0] + orientation[0] * i
+        y = position[1] + orientation[1] * i
         # Comprobamos que la posicion este dentro de la sopa
         if 0 <= x < dim and 0 <= y < dim:
             # Si la posicion no esta ocupada, o si se esta permitido
             # que las palabras se intersequen y el caracter a posicionar
             # es el mismo que se encuentra en la posicion, escribimos el
             # a la copia
-            if sopa[y][x] == '_' or (intersecar_palabras and palabra[i] == sopa[y][x]):
-                copia[y][x] = palabra[i]
+            if grid[y][x] == '_' or (cross and word[i] == grid[y][x]):
+                copy[y][x] = word[i]
                 continue
         # Si no se ha podido modificar la sopa, retornamos
         # la sopa original
-        return (False, sopa)
+        return (False, grid)
 
-    return (True, copia)
+    return (True, copy)
 
 
-def hay_duplicados(sopa, palabras):
+def check_duplicates(grid: GRID, words: set[str]) -> bool:
     """
     hay_duplicados : Sopa Palabras -> Bool
 
@@ -209,38 +199,34 @@ def hay_duplicados(sopa, palabras):
     )
     True
     """
-    contador_palabras = {palabra: 0 for palabra in palabras}
+    words_counter = {word: 0 for word in words}
     # combinaciones es una lista de strings que almacenara
     # todas las filas columnas y diagonales de la sopa
-    combinaciones = []
-    combinaciones.extend(obtener_filas(sopa))
-    combinaciones.extend(obtener_columnas(sopa))
-    combinaciones.extend(obtener_diagonales(sopa))
+    combinations = []
+    combinations.extend(get_rows(grid))
+    combinations.extend(get_cols(grid))
+    combinations.extend(get_diagonals(grid))
 
     # Ordenamos las palabras por su longitud, de menor a mayor
-    palabras_ordenadas = sorted(palabras, key = len)
+    sorted_words = sorted(words, key = len)
 
     # Iteramos sobre las cadenas de caracteres que hay en la sopa
-    for cadena in combinaciones:
-        for palabra in palabras_ordenadas:
+    for string in combinations:
+        for word in sorted_words:
             # Si la palabra esta contenida en alguna de las cadenas
             # en la sopa (o la palabra al reves lo esta), aumentamos
             # en uno la cantidad de apariciones de dicha palabra en la sopa
-            if palabra in cadena or palabra[::-1] in cadena:
-                contador_palabras[palabra] += 1
+            if word in string or word[::-1] in string:
+                words_counter[word] += 1
+                if words_counter[word] > 1:
+                    return True
                 break
-    palabra_esta_repetida = lambda palabra: contador_palabras[palabra] > 1
-    # Obtenemos un conjunto de las palabras que aparezcan mas de una vez en
-    # la sopa (osea las palabras que estan repetidas)
-    palabras_repetidas = set(filter(palabra_esta_repetida, palabras))
-    # Si hay algun elemento en el conjunto, entonces es porque hay repeticiones,
-    # de lo contrario no hay repeticiones
-    return len(palabras_repetidas) > 0
+    return False
 
 
 # ---------------------- OBTENER COLUMNAS, FILAS Y DIAGONALES ------------------
 
-def obtener_filas(sopa):
+def get_rows(grid: GRID) -> List[str]:
     """
     obtener_fila: Sopa -> List(Str)
     
@@ -255,11 +241,10 @@ def obtener_filas(sopa):
     """
     # Para cada fila en la sopa, juntamos los caracteres
     # y asi obtenemos el string a lo largo de la fila
-    filas = ["".join(fila) for fila in sopa]
-    return filas
+    return ["".join(row) for row in grid]
 
 
-def obtener_columnas(sopa):
+def get_cols(grid: GRID) -> List[str]:
     """
     obtener_columnas: Sopa -> List(Str)
     Retorna la lista de strings que se forman en las
@@ -270,20 +255,20 @@ def obtener_columnas(sopa):
     >>> obtener_diagonal([["s", "o", "l"], ["d", "o", "s"], ["l", "a", "s"]]) 
     ["sdl", "ooa", "lss"]
     """
-    columnas = []
+    cols = []
     # Hacemos tantas repeticiones como columnas haya
-    for i in range(len(sopa)):
+    for i in range(len(grid)):
         col = ""
         # Por cada columna recorremos sobre las filas
-        for j in range(len(sopa)):
+        for j in range(len(grid)):
             # Añadimos el caracter al string col
-            col += sopa[j][i]
+            col += grid[j][i]
         # Añadimos el string que se forma a la lista de columnas
-        columnas.append(col)
-    return columnas
+        cols.append(col)
+    return cols
 
 
-def obtener_diagonales(sopa):
+def get_diagonals(grid: GRID) -> List[str]:
     """
     obtener_diagonal: Sopa -> List(Str)
     Retorna una lista de strings que se forman a lo largo
@@ -294,22 +279,26 @@ def obtener_diagonales(sopa):
     >>> obtener_diagonales([["a", "b"], ["c", "d"]])
     ["ad", "b", "c", "bc", "d", "a"]
     """
-    diagonales = []
-    sopa_inv = [fila[::-1] for fila in sopa]
-    dim = len(sopa)
+    diagonals = []
+    # Grid reversed horizontally to obtain the diagonals
+    # of the matrix going in the other direction
+    # [["a", "b"], ["c", "d"]] -> [["b", "a"], ["d", "c"]]
+    flipped_grid = [row[::-1] for row in grid]
+    dim = len(grid)
 
     # Agregamos las dos diagonales que
     # van de esquina a esquina
-    diagonal = ""
-    diagonal_inv = ""
+    # Main diagonals
+    diag = ""
+    flipped_diag = ""
     for i in range(dim):
-        diagonal += sopa[i][i]
-        diagonal_inv += sopa_inv[i][i]
+        diag += grid[i][i]
+        flipped_diag += flipped_grid[i][i]
 
-    diagonales.append(diagonal)
-    diagonales.append(diagonal_inv)
+    diagonals.append(diag)
+    diagonals.append(flipped_diag)
 
-    # Agregamos las demas diagonales
+    # Remaining diagonals
     for j in range(1, dim):
         
         # --- Diagonales de sentido arriba  ---
@@ -317,131 +306,106 @@ def obtener_diagonales(sopa):
         
         # Diagonal que comienza desde arriba
         # desplazada j posiciones a la derecha
-        diagonal_x = ""
+        diag_x = ""
         # Diagonal que comienza desde la izquierda
         # desplazada j posiciones hacia abajo
-        diagonal_y = ""
+        diag_y = ""
         
         # --- Diagonales de sentido arriba  ---
         # --- derecha hacia abajo izquierda ---
         
         # Diagonal que comienza desde arriba
         # desplazada j posiciones hacia la izquierda
-        diagonal_inv_x = ""
+        flipped_diag_x = ""
         # Diagonal que comienza desde la derecha
         # desplazada j posiciones hacia abajo
-        diagonal_inv_y = ""
+        flipped_diag_y = ""
 
         for i in range(dim - j):
-            diagonal_x += sopa[i][j+i]
-            diagonal_y += sopa[j+i][i]
-            diagonal_inv_x += sopa_inv[i][j+i]
-            diagonal_inv_y += sopa_inv[j+i][i]
+            diag_x += grid[i][j+i]
+            diag_y += grid[j+i][i]
+            flipped_diag_x += flipped_grid[i][j+i]
+            flipped_diag_y += flipped_grid[j+i][i]
 
-        diagonales.extend((diagonal_x, diagonal_y, diagonal_inv_x, diagonal_inv_y))
+        diagonals.extend((diag_x, diag_y, flipped_diag_x, flipped_diag_y))
 
-    return diagonales
+    return diagonals
 
 
 # ------------------------ FUNCIONES AUXILIARES SOPA ----------------
 
-def direcciones_por_complejidad(complejidad):
+def direcciones_por_complejidad(complexity: int) -> set[ORIENTATION]:
     """
     direcciones_por_complejidad: Int -> Set(Direccion)
     
-    Recibe el nivel de complejidad del juego y devuelve un
+    Recibe el nivel de complexity del juego y devuelve un
     conjunto de tuplas las cuales representan las direcciones
     en las cuales pueden estar dispuestas las palabras
     """
-    direcciones = {(1,0), (0,1)}
-    if complejidad >= 1:
-        direcciones.add((1,1))
-        if complejidad > 1:    
-            direcciones.update([(-1,0), (0,-1), (-1,-1), (1,-1), (-1,1)])
-    return direcciones
+    orientations = {(1,0), (0,1)}
+    if complexity >= 1:
+        orientations.add((1,1))
+        if complexity > 1:    
+            orientations.update([(-1,0), (0,-1), (-1,-1), (1,-1), (-1,1)])
+    return orientations
 
 
-def validar_palabras(dim, palabras, complejidad):
+def fill_blanks(grid: GRID) -> GRID:
     """
-    validar_palabras: Int Palabras Int -> None
-    La funcion corre algunos casos de prueba iniciales para
-    ver si es posible armar una sopa de letras con las palabras
-    y dimension dadas. Esto es para descartar desde el comienzo
-    algunos casos donde no es posible armar la sopa de letras, por
-    lo que el hecho de que la funcion no levante un error no
-    nos asegura que vaya a ser posible el armado de la sopa
-    """
-    cant_caracteres = 0
-    for palabra in palabras:
-        # Si la longitud de la palabra es mayor a la dimension
-        # de la sopa, entonces no es posible insertar la palabra
-        if len(palabra) > dim:
-            error = "No es posible insertar una palabra de " + str(len(palabra))
-            error +=  " caracteres en una sopa de dimension " + str(dim)
-            raise ValueError(error)
-        cant_caracteres += len(palabra)
-    # En el caso en que las palabras no se puedan superponer (si complejidad < 3)
-    # la suma de todas las letras de las palabras no puede ser mayor
-    # a la cantidad de casillas de la sopa
-    if cant_caracteres > dim ** 2 and complejidad < 3:
-        error = "No se puede generar una sopa de letras con " + str(cant_caracteres) 
-        error += " caracteres y " + str((dim ** 2)) + " casillas"
-        raise ValueError(error)
-    return
-
-
-def completar_espacios(sopa):
-    """
-    completar_espacios: Sopa -> Sopa
+    fill_blanks: Sopa -> Sopa
     Toma una sopa y completa todos los espacios
     que esten vacios (se considera vacio si hay un "_" en
     dicha posicion) con alguna letra aleatoria
     """
-    copia = copiar_sopa(sopa)
-    dim = len(sopa)
+    copy = copy_grid(grid)
+    dim = len(grid)
 
     # Iteramos sobre filas y columnas
     for i in range(dim):
         for j in range(dim):
             # Si en la posicion actual la sopa no esta
             # vacia, continuamos
-            if sopa[i][j] != '_':
+            if grid[i][j] != '_':
                 continue
             # Sino, la completamos con una letra aleatoria
-            letra = chr(random.randint(ord("a"), ord("z")))
-            copia[i][j] = letra
+            letter = chr(random.randint(ord("a"), ord("z")))
+            copy[i][j] = letter
 
-    return copia
+    return copy
 
 
-def imprimir_sopa(sopa):
+def print_wordsearch(wordsearch: GRID, words: set[str]) -> None:
     """
-    imprimir_sopa: Sopa -> None
+    print_wordsearch: Sopa -> None
     Toma una sopa y la imprime a la terminal
     """
+    print("\nWORDSEARCH")
+    print("Words to search: ")
+    for word in words:
+        print(f"- {word}")
     print()
-    for fila in sopa:
-        print(" ".join(fila))
+    for row in wordsearch:
+        print(" ".join(row))
     print()
 
 
-def copiar_sopa(sopa):
+def copy_grid(grid: GRID) -> GRID:
     """
-    copiar_sopa: Sopa -> Sopa
+    copy_grid: Sopa -> Sopa
     Toma una sopa y retorna una copia, para poder
     modificar la copia sin modificar la original
     """
-    copia = []
+    copy = []
     # Iteramos sobre las filas
-    for fila in sopa:
+    for row in grid:
         # Agregamos a copia una copia de la fila
-        copia.append(fila[:])
-    return copia
+        copy.append(row[:])
+    return copy
 
 
 # ------------------------- FUNCION PRINCIPAL -----------------------
 
-def main():
+def main() -> None:
     """
     main: None -> None
 
@@ -456,27 +420,21 @@ def main():
         return
 
     args = sys.argv[1:]
-    filename, nwords, dim, cplex = args
-    nwords, dim, cplex = int(nwords), int(dim), int(cplex)
+    filename, nwords, dim, complexity = args
+    nwords, dim, complexity = int(nwords), int(dim), int(complexity)
 
+    # Randomly choose words that fit
     words = choose_words(filename, nwords, dim)
 
-    # Intentamos descartar casos donde no es posible
-    # armar una sopa de letras
-    validar_palabras(dim, words, cplex)
+    # We generate a grid with the required conditions
+    grid = make_wordsearch(dim, words, complexity)
+    if grid is None:
+        raise ValueError("Could not generate a wordsearch with the asked conditions")
 
-    # Generamos una lista con las condiciones requeridas
-    sopa_incompleta = generar_sopa(dim, words, cplex)
-    if sopa_incompleta == list():
-        raise ValueError("No se pudo generar una sopa de letras con las condiciones pedidas")
+    # Fill the wordsearch without creating duplicates
+    wordsearch = fill_wordsearch(grid, words)
 
-    # Completamos la sopa asegurandonos que no se generen
-    # palabras duplicadas
-    sopa = completar_sopa(sopa_incompleta, words)
-
-    # Escribimos la salida a la terminal
-    print("Sopa De Letras")
-    imprimir_sopa(sopa)
+    print_wordsearch(wordsearch, words)
 
 
 if __name__ == "__main__":

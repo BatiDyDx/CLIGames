@@ -13,12 +13,16 @@ int main(int argc, char const *argv[])
     char *secret_word = get_word(argv[1]);
     out = play(secret_word);
 
-    if (out == 1) {
-        printf("Congratulations! You won :)\n");
-    } else if (out == -1) {
+    switch (out) {
+    case -1:
         printf("You finished the game\n");
-    } else {
+        break;
+    case 0:
         printf("You lost, but keep trying :(\n");
+        break;
+    default:
+        printf("Congratulations! You won :)\n");
+        break;
     }
     printf("The word was: << %s >>\n", secret_word);
     free(secret_word);

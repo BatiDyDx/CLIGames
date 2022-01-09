@@ -1,5 +1,5 @@
 CC = gcc
-BIN = hangman_c
+BIN = hangman
 FLAGS = -Wall
 
 SRC = hangman.c IO.c main.c
@@ -7,11 +7,11 @@ OBJS = hangman.o IO.o main.o
 
 .PHONY: clean install
 
-compile: $(OBJS)
-	$(CC) $(FLAGS) $< -o $(BIN)
+$(BIN):
+	$(CC) $(FLAGS) $(SRC) -o $(BIN)
 
 install: compile
-	mv $(BIN) ../../bin
+	cp $(BIN) ../../bin
 
 %.o: %.c
 	$(CC) $(FLAGS) $< -o $@

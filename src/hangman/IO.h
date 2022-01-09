@@ -1,4 +1,5 @@
 #ifndef IO_H
+
     #define IO_H
 
     #include <time.h>
@@ -7,6 +8,8 @@
     #include <assert.h>
     #include <string.h>
 
+
+    #define clear_screen() system(CLEAN_CMD);
 
     #ifdef _WIN32
         #define CLEAN_CMD "cls"
@@ -33,12 +36,6 @@
     char* get_word(const char *filename);
 
     /*
-    Returns a random integer between min and max,
-    only low endpoint included
-    */
-    static int random_num(int min, int max);
-
-    /*
     Returns a FILE_CONTENT with the number of
     lines and an array of pointers pointing to
     the lines of the file
@@ -51,10 +48,5 @@
     and the array itself
     */
     void free_FILE_CONTENT(FILE_CONTENT* fc);
-
-    /*
-    Clears command line
-    */
-    void clear_screen(void);
 
 #endif
